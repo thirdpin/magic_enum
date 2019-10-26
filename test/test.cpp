@@ -39,12 +39,21 @@ enum Directions { Up = 85, Down = -42, Right = 120, Left = -120 };
 
 enum number : unsigned long { one = 100, two = 200, three = 300, four = 400 };
 
+enum class AnimalFlags { HasClaws = 1, CanFly = 2, EatsFish = 4, Endangered = 8 };
+
 namespace magic_enum {
+
 template <>
 struct enum_range<number> {
   static constexpr int min = 100;
   static constexpr int max = 300;
 };
+
+template <>
+struct enum_range<AnimalFlags> {
+  static constexpr bool is_flags = true;
+};
+
 }
 
 using namespace magic_enum;

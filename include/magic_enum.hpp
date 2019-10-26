@@ -94,6 +94,24 @@ struct supported
 template <typename T>
 inline constexpr bool is_enum_v = std::is_enum_v<T> && std::is_same_v<T, std::decay_t<T>>;
 
+template <typename E, typename = void>
+struct is_flags : std::false_type {};
+
+template <typename E>
+struct is_flags<E, std::enable_if_t<enum_range<E>::is_flags>> : std::bool_constant<enum_range<E>::is_flags> {};
+
+template <typename E, typename = void>
+struct has_min : std::false_type {};
+
+template <typename E>
+struct has_min<E, std::enable_if_t<std::is_integral_v<decltype(enum_range<E>::min)>>> : std::true_type {};
+
+template <typename E, typename = void>
+struct has_max : std::false_type {};
+
+template <typename E>
+struct has_max<E, std::enable_if_t<std::is_integral_v<decltype(enum_range<E>::max)>>> : std::true_type {};
+
 template <std::size_t N>
 struct static_string {
   constexpr static_string(std::string_view str) noexcept : static_string{str, std::make_index_sequence<N>{}} {}
@@ -201,21 +219,35 @@ inline constexpr auto name_v = n<E, V>();
 template <typename E>
 constexpr int reflected_min() noexcept {
   static_assert(is_enum_v<E>, "magic_enum::detail::reflected_min requires enum type.");
-  constexpr auto lhs = enum_range<E>::min;
-  static_assert(lhs > (std::numeric_limits<std::int16_t>::min)(), "magic_enum::enum_range requires min must be greater than INT16_MIN.");
-  constexpr auto rhs = (std::numeric_limits<std::underlying_type_t<E>>::min)();
+  if constexpr (is_flags<E>::value) {
+    static_assert(!has_min<E>::value, "magic_enum::enum_range for enum flags requires a lack of min.");
 
-  return mixed_sign_less(lhs, rhs) ? rhs : lhs;
+    return 0;
+  } else {
+    static_assert(has_min<E>::value, "magic_enum::enum_range requires min.");
+    constexpr auto lhs = enum_range<E>::min;
+    static_assert(lhs > (std::numeric_limits<std::int16_t>::min)(), "magic_enum::enum_range requires min must be greater than INT16_MIN.");
+    constexpr auto rhs = (std::numeric_limits<std::underlying_type_t<E>>::min)();
+
+    return mixed_sign_less(lhs, rhs) ? rhs : lhs;
+  }
 }
 
 template <typename E>
 constexpr int reflected_max() noexcept {
   static_assert(is_enum_v<E>, "magic_enum::detail::reflected_max requires enum type.");
-  constexpr auto lhs = enum_range<E>::max;
-  static_assert(lhs < (std::numeric_limits<std::int16_t>::max)(), "magic_enum::enum_range requires max must be less than INT16_MAX.");
-  constexpr auto rhs = (std::numeric_limits<std::underlying_type_t<E>>::max)();
+  if constexpr (is_flags<E>::value) {
+    static_assert(!has_max<E>::value, "magic_enum::enum_range for enum flags requires a lack of max.");
 
-  return mixed_sign_less(lhs, rhs) ? lhs : rhs;
+    return std::numeric_limits<std::underlying_type_t<E>>::digits;
+  } else {
+    static_assert(has_max<E>::value, "magic_enum::enum_range requires max.");
+    constexpr auto lhs = enum_range<E>::max;
+    static_assert(lhs < (std::numeric_limits<std::int16_t>::max)(), "magic_enum::enum_range requires max must be less than INT16_MAX.");
+    constexpr auto rhs = (std::numeric_limits<std::underlying_type_t<E>>::max)();
+
+    return mixed_sign_less(lhs, rhs) ? lhs : rhs;
+  }
 }
 
 template <typename E>
@@ -235,16 +267,27 @@ constexpr std::size_t reflected_size() noexcept {
   return static_cast<std::size_t>(size);
 }
 
+template <typename E>
+constexpr E value(int i) noexcept {
+  static_assert(is_enum_v<E>, "magic_enum::detail::value requires enum type.");
+
+  if constexpr (is_flags<E>::value) {
+    return static_cast<E>(static_cast<std::uint64_t>(0x1) << (i + reflected_min_v<E>));
+  } else {
+    return static_cast<E>(i + reflected_min_v<E>);
+  }
+}
+
 template <typename E, int... I>
 constexpr auto values(std::integer_sequence<int, I...>) noexcept {
   static_assert(is_enum_v<E>, "magic_enum::detail::values requires enum type.");
-  constexpr std::array<bool, sizeof...(I)> valid{{(n<E, static_cast<E>(I + reflected_min_v<E>)>().size() != 0)...}};
+  constexpr std::array<bool, sizeof...(I)> valid{{(n<E, value<E>(I)>().size() != 0)...}};
   constexpr int count = ((valid[I] ? 1 : 0) + ...);
 
   std::array<E, count> values{};
   for (int i = 0, v = 0; v < count; ++i) {
     if (valid[i]) {
-      values[v++] = static_cast<E>(i + reflected_min_v<E>);
+      values[v++] = value<E>(i);
     }
   }
 
@@ -258,19 +301,24 @@ template <typename E>
 inline constexpr std::size_t count_v = values_v<E>.size();
 
 template <typename E>
-inline constexpr int min_v = values_v<E>.empty() ? 0 : static_cast<int>(values_v<E>.front());
+inline constexpr std::underlying_type_t<E> min_v = values_v<E>.empty() ? 0 : static_cast<std::underlying_type_t<E>>(values_v<E>.front());
 
 template <typename E>
-inline constexpr int max_v = values_v<E>.empty() ? 0 : static_cast<int>(values_v<E>.back());
+inline constexpr std::underlying_type_t<E> max_v = values_v<E>.empty() ? 0 : static_cast<std::underlying_type_t<E>>(values_v<E>.back());
 
 template <typename E>
 constexpr std::size_t range_size() noexcept {
   static_assert(is_enum_v<E>, "magic_enum::detail::range_size requires enum type.");
-  constexpr auto size = max_v<E> - min_v<E> + 1;
-  static_assert(size > 0, "magic_enum::enum_range requires valid size.");
-  static_assert(size < (std::numeric_limits<std::uint16_t>::max)(), "magic_enum::enum_range requires valid size.");
 
-  return static_cast<std::size_t>(size);
+  if constexpr (is_flags<E>::value) {
+    return 0;
+  } else {
+    constexpr auto size = max_v<E> - min_v<E> + 1;
+    static_assert(size > 0, "magic_enum::enum_range requires valid size.");
+    static_assert(size < (std::numeric_limits<std::uint16_t>::max)(), "magic_enum::enum_range requires valid size.");
+
+    return static_cast<std::size_t>(size);
+  }
 }
 
 template <typename E>
@@ -285,7 +333,7 @@ inline constexpr auto invalid_index_v = (std::numeric_limits<index_t<E>>::max)()
 template <typename E, int... I>
 constexpr auto indexes(std::integer_sequence<int, I...>) noexcept {
   static_assert(is_enum_v<E>, "magic_enum::detail::indexes requires enum type.");
-  index_t<E> i = 0;
+  [[maybe_unused]] index_t<E> i = 0;
 
   return std::array<index_t<E>, sizeof...(I)>{{((n<E, static_cast<E>(I + min_v<E>)>().size() != 0) ? i++ : invalid_index_v<E>)...}};
 }
@@ -351,7 +399,19 @@ struct enum_traits<E, std::enable_if_t<is_enum_v<E>>> {
 
   [[nodiscard]] static constexpr int index(E value) noexcept {
     if (static_cast<U>(value) >= static_cast<U>(min_v<E>) && static_cast<U>(value) <= static_cast<U>(max_v<E>)) {
-      if constexpr (is_sparse) {
+      if constexpr (is_flags<E>::value) {
+        auto is_flag_value = [](U x) constexpr noexcept {
+          return x > 0 && (x & (x - 1)) == 0;
+        };
+
+        if (is_flag_value(static_cast<U>(value))) {
+          for (int i = 0; i < count; ++i) {
+            if (value == values[i]) {
+              return i;
+            }
+          }
+        }
+      } else if constexpr (is_sparse) {
         if (auto i = indexes[static_cast<U>(value) - min_v<E>]; i != invalid_index_v<E>) {
           return i;
         }
