@@ -24,7 +24,7 @@
 
 #include <magic_enum.hpp>
 
-enum class AnimalFlags : std::uint64_t { HasClaws = 1, CanFly = 2, EatsFish = 4, Endangered = (std::uint64_t)1 << 63 };
+enum class AnimalFlags : std::uint64_t { HasClaws = 1, CanFly = 2, EatsFish = 4, Endangered = 8 };
 
 namespace magic_enum {
   template <>
@@ -35,40 +35,40 @@ namespace magic_enum {
 
 int main() {
   // Enum variable to string name.
-  AnimalFlags c1 = AnimalFlags::CanFly;
-  auto c1_name = magic_enum::enum_name(c1);
-  std::cout << c1_name << std::endl; // CanFly
+  AnimalFlags f1 = AnimalFlags::CanFly;
+  auto f1_name = magic_enum::enum_name(f1);
+  std::cout << f1_name << std::endl; // CanFly
 
   // String enum name sequence.
-  constexpr auto AnimalFlags_names = magic_enum::enum_names<AnimalFlags>();
+  constexpr auto names = magic_enum::enum_names<AnimalFlags>();
   std::cout << "AnimalFlags names:";
-  for (auto n : AnimalFlags_names) {
+  for (auto n : names) {
     std::cout << " " << n;
   }
   std::cout << std::endl;
   // AnimalFlags names: HasClaws CanFly EatsFish Endangered
 
   // String name to enum value.
-  auto c2 = magic_enum::enum_cast<AnimalFlags>("EatsFish");
-  if (c2.has_value() && c2.value() == AnimalFlags::EatsFish) {
-    std::cout << "EatsFish = " << static_cast<int>(c2.value()) << std::endl; // EatsFish = 4
+  auto f2 = magic_enum::enum_cast<AnimalFlags>("EatsFish");
+  if (f2.has_value() && f2.value() == AnimalFlags::EatsFish) {
+    std::cout << "EatsFish = " << static_cast<int>(f2.value()) << std::endl; // EatsFish = 4
   }
 
   // Integer value to enum value.
-  auto c3 = magic_enum::enum_cast<AnimalFlags>(8);
-  if (c3.has_value() && c3.value() == AnimalFlags::Endangered) {
-    std::cout << "Endangered = " << magic_enum::enum_integer(c3.value()) << std::endl; // Endangered = 8
+  auto f3 = magic_enum::enum_cast<AnimalFlags>(8);
+  if (f3.has_value() && f3.value() == AnimalFlags::Endangered) {
+    std::cout << "Endangered = " << magic_enum::enum_integer(f3.value()) << std::endl; // Endangered = 8
   }
 
   // Enum value to integer value.
-  auto AnimalFlags_integer = magic_enum::enum_integer(AnimalFlags::HasClaws);
-  if (AnimalFlags_integer == static_cast<std::underlying_type_t<AnimalFlags>>(AnimalFlags::HasClaws)) {
-    std::cout << "HasClaws = " << AnimalFlags_integer << std::endl; // HasClaws = 1
+  auto f4_integer = magic_enum::enum_integer(AnimalFlags::HasClaws);
+  if (f4_integer == static_cast<std::underlying_type_t<AnimalFlags>>(AnimalFlags::HasClaws)) {
+    std::cout << "HasClaws = " << f4_integer << std::endl; // HasClaws = 1
   }
 
   using namespace magic_enum::ostream_operators; // out-of-the-box ostream operator for all enums.
   // ostream operator for enum.
-  std::cout << c1 << " " << c2 << " " << c3 << std::endl; // CanFly EatsFish Endangered
+  std::cout << f1 << " " << f2 << " " << f3 << std::endl; // CanFly EatsFish Endangered
 
   // Number of enum values.
   std::cout << "AnimalFlags enum size: " << magic_enum::enum_count<AnimalFlags>() << std::endl; // AnimalFlags enum size: 4
@@ -77,23 +77,23 @@ int main() {
   std::cout << "AnimalFlags[0] = " << magic_enum::enum_value<AnimalFlags>(0) << std::endl; // AnimalFlags[0] = HasClaws
 
   // Enum value sequence.
-  constexpr auto AnimalFlagss = magic_enum::enum_values<AnimalFlags>();
-  std::cout << "AnimalFlagss sequence:";
-  for (AnimalFlags c : AnimalFlagss) {
-    std::cout << " " << c; // ostream operator for enum.
+  constexpr auto values = magic_enum::enum_values<AnimalFlags>();
+  std::cout << "AnimalFlags values:";
+  for (AnimalFlags f : values) {
+    std::cout << " " << f; // ostream operator for enum.
   }
   std::cout << std::endl;
   // AnimalFlags sequence: HasClaws CanFly EatsFish Endangered
 
   using namespace magic_enum::bitwise_operators; // out-of-the-box bitwise operators for all enums.
   // Support operators: ~, |, &, ^, |=, &=, ^=.
-  AnimalFlags flags = AnimalFlags::HasClaws | AnimalFlags::CanFly;
-  std::cout << flags << std::endl;
+  AnimalFlags flag = AnimalFlags::HasClaws | AnimalFlags::CanFly;
+  std::cout << flag << std::endl;
 
   // Enum pair (value enum, string enum name) sequence.
-  constexpr auto AnimalFlags_entries = magic_enum::enum_entries<AnimalFlags>();
-  std::cout << "AnimalFlagss entries:";
-  for (auto e : AnimalFlags_entries) {
+  constexpr auto entries = magic_enum::enum_entries<AnimalFlags>();
+  std::cout << "AnimalFlags entries:";
+  for (auto e : entries) {
     std::cout << " "  << e.second << " = " << static_cast<int>(e.first);
   }
   std::cout << std::endl;
