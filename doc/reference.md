@@ -5,10 +5,12 @@
 * [`enum_values` obtains enum value sequence.](#enum_values)
 * [`enum_count` returns number of enum values.](#enum_count)
 * [`enum_integer` obtains integer value from enum value.](#enum_integer)
-* [`enum_name` returns string name from enum value.](#enum_name)
+* [`enum_name` returns name from enum value.](#enum_name)
 * [`enum_names` obtains string enum name sequence.](#enum_names)
 * [`enum_entries` obtains pair (value enum, string enum name) sequence.](#enum_entries)
 * [`enum_index` obtains index in enum value sequence from enum value.](#enum_index)
+* [`enum_contains` checks whether enum contains enumerator with such value.](#enum_contains)
+* [`enum_type_name` returns type name of enum.](#enum_type_name)
 * [`is_unscoped_enum` checks whether type is an Unscoped enumeration.](#is_unscoped_enum)
 * [`is_scoped_enum` checks whether type is an Scoped enumeration.](#is_scoped_enum)
 * [`underlying_type` improved UB-free "SFINAE-friendly" std::underlying_type.](#underlying_type)
@@ -22,14 +24,19 @@
 * To check is magic_enum supported compiler use macro `MAGIC_ENUM_SUPPORTED` or constexpr constant `magic_enum::is_magic_enum_supported`.</br>
   If magic_enum used on unsupported compiler, occurs the compilation error. To suppress error define macro `MAGIC_ENUM_NO_CHECK_SUPPORT`.
 
+* For the small enum use the API from the namespace `magic_enum`, and for enum-flags use the API from the namespace `magic_enum::flags`.
+
 ## `enum_cast`
 
 ```cpp
 template <typename E>
-constexpr optional<E> enum_cast(string_view value) noexcept;
+constexpr optional<E> enum_cast(underlying_type_t<E> value) noexcept;
 
 template <typename E>
-constexpr optional<E> enum_cast(underlying_type_t<E> value) noexcept;
+constexpr optional<E> enum_cast(string_view value) noexcept;
+
+template <typename E, typename BinaryPredicate>
+constexpr optional<E> enum_cast(string_view value, BinaryPredicate p) noexcept(is_nothrow_invocable_v<BinaryPredicate>);
 ```
 
 * Obtains enum value from string or integer.
@@ -43,7 +50,7 @@ constexpr optional<E> enum_cast(underlying_type_t<E> value) noexcept;
   * String to enum value.
 
     ```cpp
-    std::string color_name{"GREEN"};
+    string color_name{"GREEN"};
     auto color = magic_enum::enum_cast<Color>(color_name);
     if (color.has_value()) {
         // color.value() -> Color::GREEN
@@ -86,7 +93,7 @@ template <typename E>
 constexpr array<E, N> enum_values() noexcept;
 ```
 
-* Returns `std::array<E, N>` with all enum value where `N = number of enum values`, sorted by enum value.
+* Returns `std::array<E, N>` with all enum values where `N = number of enum values`, sorted by enum value.
 
 * Examples
 
@@ -108,7 +115,7 @@ constexpr size_t enum_count() noexcept;
 * Examples
 
   ```cpp
-  constexpr std::size_t color_count = magic_enum::enum_count<Color>();
+  constexpr auto color_count = magic_enum::enum_count<Color>();
   // color_count -> 3
   ```
 
@@ -139,7 +146,7 @@ template <auto V>
 constexpr string_view enum_name() noexcept;
 ```
 
-* Returns `std::string_view`.
+* Returns name from enum value as `std::string_view` with null-terminated string.
   * If enum value does not have name or [out of range](limitations.md), `enum_name(value)` returns empty string.
   * If enum value does not have name, `enum_name<value>()` occurs the compilation error `"Enum value does not have a name."`.
 
@@ -163,8 +170,6 @@ constexpr string_view enum_name() noexcept;
     // color_name -> "BLUE"
     ```
 
-* `magic_enum::enum_name<value>()` is much lighter on the compile times and is not restricted to the enum_range [limitation](limitation.md).
-
 ## `enum_names`
 
 ```cpp
@@ -172,7 +177,7 @@ template <typename E>
 constexpr array<string_view, N> enum_names() noexcept;
 ```
 
-* Returns `std::array<std::string_view, N>` with all string enum name where `N = number of enum values`, sorted by enum value.
+* Returns `std::array<std::string_view, N>` with all names where `N = number of enum values`, sorted by enum value.
 
 * Examples
 
@@ -189,7 +194,7 @@ template <typename E>
 constexpr array<pair<E, string_view>, N> enum_entries() noexcept;
 ```
 
-* Returns `std::array<std::pair<E, std::string_view>, N>` with all `std::pair` (value enum, string enum name) where `N = number of enum values`, sorted by enum value.
+* Returns `std::array<std::pair<E, std::string_view>, N>` with all pairs (value, name) where `N = number of enum values`, sorted by enum value.
 
 * Examples
 
@@ -198,6 +203,72 @@ constexpr array<pair<E, string_view>, N> enum_entries() noexcept;
   // color_entries -> {{Color::RED, "RED"}, {Color::BLUE, "BLUE"}, {Color::GREEN, "GREEN"}}
   // color_entries[0].first -> Color::RED
   // color_entries[0].second -> "RED"
+  ```
+
+## `enum_index`
+
+```cpp
+template <typename E>
+constexpr optional<size_t> enum_index() noexcept;
+```
+
+* Obtains index in enum values from enum value.
+
+* Returns `std::optional<std::size_t>` with index.
+
+* Examples
+
+  ```cpp
+  constexpr auto color_index = magic_enum::enum_index(Color::BLUE);
+  // color_index -> color_index.value() -> 1
+  // color_index -> color_index.has_value() -> true
+  ```
+
+## `enum_contains`
+
+```cpp
+template <typename E>
+constexpr bool enum_contains(E value) noexcept;
+
+template <typename E>
+constexpr bool enum_contains(underlying_type_t<E> value) noexcept;
+
+template <typename E>
+constexpr bool enum_contains(string_view value) noexcept;
+
+template <typename E, typename BinaryPredicate>
+constexpr optional<E> enum_contains(string_view value, BinaryPredicate p) noexcept(is_nothrow_invocable_v<BinaryPredicate>);
+```
+
+* Checks whether enum contains enumerator with such value.
+
+* Returns true is enum contains value, otherwise false.
+
+* Examples
+
+  ```cpp
+  magic_enum::enum_contains(Color::GREEN); // -> true
+  magic_enum::enum_contains<Color>(2); // -> true
+  magic_enum::enum_contains<Color>(123); // -> false
+  magic_enum::enum_contains<Color>("GREEN"); // -> true
+  magic_enum::enum_contains<Color>("fda"); // -> false
+  ```
+
+## `enum_type_name`
+
+```cpp
+template <typename E>
+constexpr string_view enum_type_name() noexcept;
+```
+
+* Returns type name of enum as `std::string_view` null-terminated string.
+
+* Examples
+
+  ```cpp
+  Color color = Color::RED;
+  auto type_name = magic_enum::enum_type_name<decltype(color)>();
+  // color_name -> "Color"
   ```
 
 ## `is_unscoped_enum`

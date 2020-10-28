@@ -22,35 +22,23 @@
     #include <magic_enum.hpp>
     ```
 
-  * If need another range for specific enum type, add specialization `enum_range` for necessary enum type.
+  * If need another range for specific enum type, add specialization `enum_range` for necessary enum type. Specialization of `enum_range` must be injected in `namespace magic_enum::customize`.
 
     ```cpp
     #include <magic_enum.hpp>
 
-    enum number { one = 100, two = 200, three = 300 };
+    enum class number { one = 100, two = 200, three = 300 };
 
-    namespace magic_enum {
+    namespace magic_enum::customize {
     template <>
     struct enum_range<number> {
       static constexpr int min = 100; // Must be greater than `INT16_MIN`.
       static constexpr int max = 300; // Must be less than `INT16_MAX`.
     };
-    }
+    } // namespace magic_enum
     ```
 
-* If you hit a message like this:
-
-  ```text
-  [...]
-  note: constexpr evaluation hit maximum step limit; possible infinite loop?
-  ```
-
-  Change the limit for the number of constexpr evaluated:
-  * MSVC `/constexpr:depthN`, `/constexpr:stepsN` <https://docs.microsoft.com/en-us/cpp/build/reference/constexpr-control-constexpr-evaluation>
-  * Clang `-fconstexpr-depth=N`, `-fconstexpr-steps=N` <https://clang.llvm.org/docs/UsersManual.html#controlling-implementation-limits>
-  * GCC `-fconstexpr-depth=N`, `-fconstexpr-loop-limit=N`, `-fconstexpr-ops-limit=N` <https://gcc.gnu.org/onlinedocs/gcc-9.2.0/gcc/C_002b_002b-Dialect-Options.html>
-
-* `magic_enum` obtains the first defined value enums, and won't work if value are aliased.
+* `magic_enum` won't work if a value is aliased. Work with enum-aliases is compiler-implementation-defined.
 
   ```cpp
   enum ShapeKind {
@@ -62,11 +50,11 @@
     Banana = 3,
     COUNT = 4,
   };
-  // magic_enum::enum_cast<ShapeKind>("Box") -> std::nullopt
-  // magic_enum::enum_name(ShapeKind::Box) -> "ConvexBegin"
+  // magic_enum::enum_cast<ShapeKind>("Box") -> std::nullopt or ShapeKind::Box
+  // magic_enum::enum_name(ShapeKind::Box) -> "ConvexBegin" or ""
   ```
 
-  Work around the issue:
+  One of the possible workaround the issue:
 
   ```cpp
   enum ShapeKind {
@@ -91,3 +79,21 @@
   // magic_enum::enum_cast<ShapeKind>("ConvexBegin") -> std::nullopt
   // magic_enum::enum_name(ShapeKind::ConvexBegin) -> "Box"
   ```
+
+  On some compiler enum-aliases not supported, [for example Visual Studio 2017](https://github.com/Neargye/magic_enum/issues/36).
+
+  It is possible to check whether enum-aliases supported using a macro `MAGIC_ENUM_SUPPORTED_ALIASES`.
+
+* If you hit a message like this:
+
+  ```text
+  [...]
+  note: constexpr evaluation hit maximum step limit; possible infinite loop?
+  ```
+
+  Change the limit for the number of constexpr evaluated:
+  * MSVC `/constexpr:depthN`, `/constexpr:stepsN` <https://docs.microsoft.com/en-us/cpp/build/reference/constexpr-control-constexpr-evaluation>
+  * Clang `-fconstexpr-depth=N`, `-fconstexpr-steps=N` <https://clang.llvm.org/docs/UsersManual.html#controlling-implementation-limits>
+  * GCC `-fconstexpr-depth=N`, `-fconstexpr-loop-limit=N`, `-fconstexpr-ops-limit=N` <https://gcc.gnu.org/onlinedocs/gcc-9.2.0/gcc/C_002b_002b-Dialect-Options.html>
+
+* Intellisense Visual Studio may have some problems analyzing `magic_enum`.
